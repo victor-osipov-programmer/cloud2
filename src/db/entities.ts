@@ -1,12 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, Relation } from "typeorm"
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, Relation, Unique } from "typeorm"
 
 @Entity('users')
+@Unique(['email'])
 export class User {
     @PrimaryGeneratedColumn()
     id: number
 
     @Column()
-    fist_name: string
+    first_name: string
 
     @Column()
     last_name: string
