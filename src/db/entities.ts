@@ -1,10 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, Relation, Unique, PrimaryColumn, BeforeInsert } from "typeorm"
-import { randomString } from "../utils"
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, Relation, Unique, PrimaryColumn, BeforeInsert, ManyToMany, JoinTable, JoinColumn } from "typeorm"
 
 @Entity('users')
 @Unique(['email'])
 export class User {
-    @PrimaryGeneratedColumn()
+    @PrimaryGeneratedColumn({ name: 'user_id' })
     id: number
 
     @Column()
@@ -19,6 +18,7 @@ export class User {
     token: string
 
     @ManyToOne(() => Role, role => role.users)
+    @JoinColumn({ name: 'role_id' })
     role: Relation<Role>
 
     @Column()
@@ -27,13 +27,25 @@ export class User {
     @Column()
     password: string
 
-    @OneToMany(() => DBFile, dbfile => dbfile.user)
+    @ManyToMany(() => DBFile, dbfile => dbfile.users)
+    @JoinTable({
+        name: 'user_id_file_id',
+        joinColumn: {
+            name: 'user_id'
+        },
+        inverseJoinColumn: {
+            name: 'file_id'
+        }
+    })
     files: Relation<DBFile[]>
+
+    @OneToMany(() => DBFile, dbfile => dbfile.owner)
+    files_owner: Relation<DBFile[]>
 }
 
 @Entity('roles')
 export class Role {
-    @PrimaryGeneratedColumn()
+    @PrimaryGeneratedColumn({ name: 'role_id' })
     id: number
 
     @Column()
@@ -57,6 +69,10 @@ export class DBFile {
     @Column()
     name: string
 
-    @ManyToOne(() => User, user => user.files)
-    user: Relation<User>
+    @ManyToMany(() => User, user => user.files)
+    users: Relation<User[]>
+
+    @ManyToOne(() => User, user => user.files_owner)
+    @JoinColumn({ name: 'user_id_owner' })
+    owner: Relation<User>
 }

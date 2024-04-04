@@ -111,6 +111,7 @@ interface IFile {
     size: number // 1855491 byte
 }
 export async function files(req, res, next) {
+    const user: User = req.user;
     let files: IFile[] = req.files
     
     const promises = files.map(async (file) => new Promise(async (resolve) => {
@@ -134,7 +135,7 @@ export async function files(req, res, next) {
         new_file.id = file_id;
         new_file.url = url;
         new_file.name = file.filename;
-        new_file.user = req.user;
+        new_file.owner = user;
 
         try {
             await fileRepository.save(new_file)
