@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, Relation, Unique } from "typeorm"
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, Relation, Unique, PrimaryColumn, BeforeInsert } from "typeorm"
+import { randomString } from "../utils"
 
 @Entity('users')
 @Unique(['email'])
@@ -25,6 +26,9 @@ export class User {
 
     @Column()
     password: string
+
+    @OneToMany(() => DBFile, dbfile => dbfile.user)
+    files: Relation<DBFile[]>
 }
 
 @Entity('roles')
@@ -37,4 +41,22 @@ export class Role {
 
     @OneToMany(() => User, user => user.role)
     users: Relation<User[]>
+}
+
+@Entity('files')
+export class DBFile {
+    @PrimaryColumn({
+        name: 'file_id',
+        length: 10
+    })
+    id: string
+
+    @Column()
+    url: string
+
+    @Column()
+    name: string
+
+    @ManyToOne(() => User, user => user.files)
+    user: Relation<User>
 }

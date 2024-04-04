@@ -24,7 +24,7 @@ export function auth(roles) {
                     role: true
                 }
             })
-            if (!user || !roles.includes(user.role.name)) {
+            if (!user || (!roles.includes(user.role.name) && roles.length !== 0)) {
                 return next(new LoginFailed())
             }
 
