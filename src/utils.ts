@@ -4,7 +4,7 @@ export function randomInteger(min, max) {
 }
 
 export function randomString(length) {
-    const symbols = '1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%-';
+    const symbols = '1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
     let str = '';
 
     for (let i = 0; i < length; i++) {

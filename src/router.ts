@@ -8,5 +8,6 @@ router.post('/authorization', controllers.authorization)
 router.post('/registration', controllers.registration)
 router.get('/logout', auth([]), controllers.logout)
 router.post('/files', auth([]), upload.array('files'), controllers.files)
+router.patch('/files/:file_id', auth([]), controllers.editFile)
 
 export default router;

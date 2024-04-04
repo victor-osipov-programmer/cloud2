@@ -1,4 +1,4 @@
-import { LoginFailed, Validator } from "./errors"
+import { FileNameIsOccupied, LoginFailed, NotFound, Validator } from "./errors"
 import { AppDataSource } from "./db/data-source";
 import { DBFile, User } from "./db/entities";
 import jwt from 'jsonwebtoken'
@@ -153,4 +153,48 @@ export async function files(req, res, next) {
     }))
 
     res.json(await Promise.all(promises))
+}
+
+export async function editFile(req, res, next) {
+    const body = req.body;
+    const { name } = body;
+    
+    const  { validate, reportError } = new Validator(body);
+    validate('name', 'required')
+    validate('name', 'not_empty')
+    if (reportError(next)) return
+
+    const file = await fileRepository.findOneBy({
+        id: req.params.file_id
+    })
+
+    try {
+        try {
+
+            await fs.access(`${process.env.FILES}/${name}`, fs.constants.F_OK)
+            throw new FileNameIsOccupied()
+            
+        } catch (err) {
+            if (err.errno == -4058) {
+
+                await fs.rename(`${process.env.FILES}/${file.name}`, `${process.env.FILES}/${name}`)
+                file.name = name
+                await fileRepository.save(file)
+
+            } else {
+                throw err;
+            }
+        }
+    } catch (err) {
+        if (err.errno == -4058) {
+            return next(new NotFound());
+        } else if (err.message == 'File name is occupied') {
+            return next(err)
+        }
+    }
+
+    res.json({
+        success: true,
+        message: 'Renamed'
+    })
 }
