@@ -211,3 +211,34 @@ export async function editFile(req, res, next) {
         message: 'Renamed'
     })
 }
+
+export async function deleteFile(req, res, next) {
+    const user: User = req.user;
+    const file = await fileRepository.findOne({
+        where: {
+            id: req.params.file_id
+        },
+        relations: {
+            owner: true
+        }
+    })
+
+    if (!file) {
+        return next(new NotFound())
+    }
+    if (file.owner.id !== user.id) {
+        return next(new ForbiddenForYou())
+    }
+
+    try {
+        await fs.rm(`${process.env.FILES}/${file.name}`)
+        await fileRepository.remove(file)
+    } catch (err) {
+        return next(err)
+    }
+
+    res.json({
+        success: true,
+        message: 'File already deleted'
+    })
+}
