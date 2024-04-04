@@ -37,6 +37,7 @@ export function auth(roles) {
 }
 
 export async function handleErrors(err, req, res, next) {
+    console.log(err)
     if (err instanceof ValidationError) {
         return res.status(err.status).json({
             success: false,

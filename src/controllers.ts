@@ -16,7 +16,9 @@ async function fileAccess(file, user) {
         throw new NotFound()
     }
     if (file.author.id !== user.id) {
-        throw new ForbiddenForYou()
+        if (!file.users?.some(owner => owner.id === user.id)) {
+            throw new ForbiddenForYou()
+        }
     }
     try {
         await fs.access(`${process.env.FILES}/${file.name}`, fs.constants.F_OK)
@@ -202,7 +204,8 @@ export async function editFile(req, res, next) {
             id: req.params.file_id
         },
         relations: {
-            author: true
+            author: true,
+            users: true
         }
     })
 
@@ -240,7 +243,8 @@ export async function deleteFile(req, res, next) {
             id: req.params.file_id
         },
         relations: {
-            author: true
+            author: true,
+            users: true
         }
     })
 
@@ -270,7 +274,8 @@ export async function downloadFile(req, res, next) {
             id: req.params.file_id
         },
         relations: {
-            author: true
+            author: true,
+            users: true
         }
     })
 
