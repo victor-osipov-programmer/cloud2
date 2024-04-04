@@ -39,8 +39,8 @@ export class User {
     })
     files: Relation<DBFile[]>
 
-    @OneToMany(() => DBFile, dbfile => dbfile.owner)
-    files_owner: Relation<DBFile[]>
+    @OneToMany(() => DBFile, dbfile => dbfile.author)
+    files_author: Relation<DBFile[]>
 }
 
 @Entity('roles')
@@ -72,7 +72,7 @@ export class DBFile {
     @ManyToMany(() => User, user => user.files)
     users: Relation<User[]>
 
-    @ManyToOne(() => User, user => user.files_owner)
-    @JoinColumn({ name: 'user_id_owner' })
-    owner: Relation<User>
+    @ManyToOne(() => User, user => user.files_author)
+    @JoinColumn({ name: 'user_id_author' })
+    author: Relation<User>
 }

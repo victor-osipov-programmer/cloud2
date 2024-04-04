@@ -11,6 +11,37 @@ const secret_key = process.env.SECRET_KEY
 const userRepository = AppDataSource.getRepository(User)
 const fileRepository = AppDataSource.getRepository(DBFile)
 
+async function fileAccess(file, user) {
+    if (!file) {
+        throw new NotFound()
+    }
+    if (file.author.id !== user.id) {
+        throw new ForbiddenForYou()
+    }
+    try {
+        await fs.access(`${process.env.FILES}/${file.name}`, fs.constants.F_OK)
+    } catch (err) {
+        throw new NotFound()
+    }
+}
+
+function getOwners(file: DBFile) {
+    const res = []
+
+    const getData = (user: User, type) => {
+        return {
+            fullname: user.first_name + ' ' + user.last_name,
+            email: user.email,
+            type
+        }
+    }
+
+    res.push(getData(file.author, 'author'))
+    res.push(...file.users.map(user => getData(user, 'co-author')))
+    
+    return res;
+}
+
 export async function authorization(req, res, next) {
     const body = req.body;
     const { email, password } = body;
@@ -136,7 +167,7 @@ export async function files(req, res, next) {
         new_file.id = file_id;
         new_file.url = url;
         new_file.name = file.filename;
-        new_file.owner = user;
+        new_file.author = user;
 
         try {
             await fileRepository.save(new_file)
@@ -171,7 +202,7 @@ export async function editFile(req, res, next) {
             id: req.params.file_id
         },
         relations: {
-            owner: true
+            author: true
         }
     })
 
@@ -202,20 +233,6 @@ export async function editFile(req, res, next) {
     })
 }
 
-async function fileAccess(file, user) {
-    if (!file) {
-        throw new NotFound()
-    }
-    if (file.owner.id !== user.id) {
-        throw new ForbiddenForYou()
-    }
-    try {
-        await fs.access(`${process.env.FILES}/${file.name}`, fs.constants.F_OK)
-    } catch (err) {
-        throw new NotFound()
-    }
-}
-
 export async function deleteFile(req, res, next) {
     const user: User = req.user;
     const file = await fileRepository.findOne({
@@ -223,7 +240,7 @@ export async function deleteFile(req, res, next) {
             id: req.params.file_id
         },
         relations: {
-            owner: true
+            author: true
         }
     })
 
@@ -253,7 +270,7 @@ export async function downloadFile(req, res, next) {
             id: req.params.file_id
         },
         relations: {
-            owner: true
+            author: true
         }
     })
 
@@ -265,3 +282,55 @@ export async function downloadFile(req, res, next) {
 
     res.sendFile(path.resolve(process.env.FILES, file.name))
 }
+
+export async function addAccess(req, res, next) {
+    const user: User = req.user;
+    const body = req.body;
+    const { email } = body;
+    
+    const  { validate, reportError } = new Validator(body);
+    validate('email', 'required')
+    if (reportError(next)) return
+
+    const file = await fileRepository.findOne({
+        where: {
+            id: req.params.file_id
+        },
+        relations: {
+            author: true,
+            users: true
+        }
+    })
+
+    try {
+        await fileAccess(file, user)
+    } catch (err) {
+        return next(err)
+    }
+
+    const coauthor = await userRepository.findOneBy({ email })
+    if (!coauthor) {
+        return next(new NotFound())
+    }
+
+    if (user.id == coauthor.id) {
+        return next({ message: 'Вы и так владелец' })
+    }
+    if (file.users.some(owner_user => owner_user.id === coauthor.id )) {
+        return next({ message: 'Уже был добавлен' })
+    }
+
+    file.users.push(coauthor)
+
+    try {
+        await fileRepository.save(file)
+    } catch (err) {
+        return next(err)
+    }
+
+    const owners = getOwners(file);
+
+    res.json(owners)
+
+}
+
