@@ -1,4 +1,4 @@
-import { FileNameIsOccupied, LoginFailed, NotFound, Validator } from "./errors"
+import { FileNameIsOccupied, ForbiddenForYou, LoginFailed, NotFound, Validator } from "./errors"
 import { AppDataSource } from "./db/data-source";
 import { DBFile, User } from "./db/entities";
 import jwt from 'jsonwebtoken'
@@ -156,6 +156,7 @@ export async function files(req, res, next) {
 }
 
 export async function editFile(req, res, next) {
+    const user: User = req.user;
     const body = req.body;
     const { name } = body;
     
@@ -164,9 +165,21 @@ export async function editFile(req, res, next) {
     validate('name', 'not_empty')
     if (reportError(next)) return
 
-    const file = await fileRepository.findOneBy({
-        id: req.params.file_id
+    const file = await fileRepository.findOne({
+        where: {
+            id: req.params.file_id
+        },
+        relations: {
+            owner: true
+        }
     })
+
+    if (!file) {
+        return next(new NotFound())
+    }
+    if (file.owner.id !== user.id) {
+        return next(new ForbiddenForYou())
+    }
 
     try {
         try {
@@ -187,7 +200,7 @@ export async function editFile(req, res, next) {
         }
     } catch (err) {
         if (err.errno == -4058) {
-            return next(new NotFound());
+            return next(new NotFound())
         } else if (err.message == 'File name is occupied') {
             return next(err)
         }
