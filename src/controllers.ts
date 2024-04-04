@@ -4,6 +4,7 @@ import { DBFile, User } from "./db/entities";
 import jwt from 'jsonwebtoken'
 import fs from 'fs/promises'
 import { randomString } from "./utils";
+import path from 'path'
 const secret_key = process.env.SECRET_KEY
 
 
@@ -174,34 +175,23 @@ export async function editFile(req, res, next) {
         }
     })
 
-    if (!file) {
-        return next(new NotFound())
-    }
-    if (file.owner.id !== user.id) {
-        return next(new ForbiddenForYou())
+    try {
+        await fileAccess(file, user)
+    } catch (err) {
+        return next(err)
     }
 
     try {
-        try {
-
-            await fs.access(`${process.env.FILES}/${name}`, fs.constants.F_OK)
-            throw new FileNameIsOccupied()
-            
-        } catch (err) {
-            if (err.errno == -4058) {
-
-                await fs.rename(`${process.env.FILES}/${file.name}`, `${process.env.FILES}/${name}`)
-                file.name = name
-                await fileRepository.save(file)
-
-            } else {
-                throw err;
-            }
-        }
+        await fs.access(`${process.env.FILES}/${name}`, fs.constants.F_OK)
+        throw new FileNameIsOccupied()
     } catch (err) {
         if (err.errno == -4058) {
-            return next(new NotFound())
-        } else if (err.message == 'File name is occupied') {
+
+            await fs.rename(`${process.env.FILES}/${file.name}`, `${process.env.FILES}/${name}`)
+            file.name = name
+            await fileRepository.save(file)
+
+        } else {
             return next(err)
         }
     }
@@ -210,6 +200,20 @@ export async function editFile(req, res, next) {
         success: true,
         message: 'Renamed'
     })
+}
+
+async function fileAccess(file, user) {
+    if (!file) {
+        throw new NotFound()
+    }
+    if (file.owner.id !== user.id) {
+        throw new ForbiddenForYou()
+    }
+    try {
+        await fs.access(`${process.env.FILES}/${file.name}`, fs.constants.F_OK)
+    } catch (err) {
+        throw new NotFound()
+    }
 }
 
 export async function deleteFile(req, res, next) {
@@ -223,13 +227,12 @@ export async function deleteFile(req, res, next) {
         }
     })
 
-    if (!file) {
-        return next(new NotFound())
+    try {
+        await fileAccess(file, user)
+    } catch (err) {
+        return next(err)
     }
-    if (file.owner.id !== user.id) {
-        return next(new ForbiddenForYou())
-    }
-
+    
     try {
         await fs.rm(`${process.env.FILES}/${file.name}`)
         await fileRepository.remove(file)
@@ -241,4 +244,24 @@ export async function deleteFile(req, res, next) {
         success: true,
         message: 'File already deleted'
     })
+}
+
+export async function downloadFile(req, res, next) {
+    const user: User = req.user;
+    const file = await fileRepository.findOne({
+        where: {
+            id: req.params.file_id
+        },
+        relations: {
+            owner: true
+        }
+    })
+
+    try {
+        await fileAccess(file, user)
+    } catch (err) {
+        return next(err)
+    }
+
+    res.sendFile(path.resolve(process.env.FILES, file.name))
 }

@@ -10,5 +10,6 @@ router.get('/logout', auth([]), controllers.logout)
 router.post('/files', auth([]), upload.array('files'), controllers.files)
 router.patch('/files/:file_id', auth([]), controllers.editFile)
 router.delete('/files/:file_id', auth([]), controllers.deleteFile)
+router.get('/files/:file_id', auth([]), controllers.downloadFile)
 
 export default router;
