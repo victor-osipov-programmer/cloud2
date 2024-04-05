@@ -5,21 +5,24 @@ import jwt from 'jsonwebtoken'
 import fs from 'fs/promises'
 import { randomString } from "./utils";
 import path from 'path'
+import { roles } from "./db/init";
 const secret_key = process.env.SECRET_KEY
 
 
 const userRepository = AppDataSource.getRepository(User)
 const fileRepository = AppDataSource.getRepository(DBFile)
 
-async function fileAccess(file, user) {
-    if (!file) {
-        throw new NotFound()
-    }
-    if (file.author.id !== user.id) {
-        if (!file.users?.some(owner => owner.id === user.id)) {
+async function fileAccess(file, user, access = 'all') {
+    if (file?.author.id !== user.id) {
+        if (access == 'author' || !file?.users?.some(owner => owner.id === user.id)) {
             throw new ForbiddenForYou()
         }
     }
+
+    if (!file) {
+        throw new NotFound()
+    }
+
     try {
         await fs.access(`${process.env.FILES}/${file.name}`, fs.constants.F_OK)
     } catch (err) {
@@ -92,9 +95,10 @@ export async function registration(req, res, next) {
 
     const user = new User()
     user.email = email
-    user.password = password;
+    user.password = password
     user.first_name = first_name
     user.last_name = last_name
+    user.role = roles.find(role => role.name == 'user')
 
     try {
         await userRepository.save(user)
@@ -308,18 +312,18 @@ export async function addAccess(req, res, next) {
     })
 
     try {
-        await fileAccess(file, user)
+        await fileAccess(file, user, 'author')
     } catch (err) {
         return next(err)
     }
 
     const coauthor = await userRepository.findOneBy({ email })
+
     if (!coauthor) {
         return next(new NotFound())
     }
-
     if (user.id == coauthor.id) {
-        return next({ message: 'Вы и так владелец' })
+        return next(new ForbiddenForYou())
     }
     if (file.users.some(owner_user => owner_user.id === coauthor.id )) {
         return next({ message: 'Уже был добавлен' })
@@ -339,3 +343,54 @@ export async function addAccess(req, res, next) {
 
 }
 
+export async function deleteAccess(req, res, next) {
+    const user: User = req.user;
+    const body = req.body;
+    const { email } = body;
+    
+    const  { validate, reportError } = new Validator(body);
+    validate('email', 'required')
+    if (reportError(next)) return
+
+    const file = await fileRepository.findOne({
+        where: {
+            id: req.params.file_id
+        },
+        relations: {
+            author: true,
+            users: true
+        }
+    })
+
+    try {
+        await fileAccess(file, user, 'author')
+    } catch (err) {
+        return next(err)
+    }
+    
+
+    const coauthor = await userRepository.findOneBy({ email })
+
+    if (!coauthor) {
+        return next(new NotFound())
+    }
+    if (user.id == coauthor.id) {
+        return next(new ForbiddenForYou())
+    }
+    if (!file.users?.some(owner => owner.id === coauthor.id)) {
+        return next(new NotFound())
+    }
+    
+
+    file.users = file.users.filter(owner => owner.id !== coauthor.id)
+
+    try {
+        await fileRepository.save(file)
+    } catch (err) {
+        return next(err)
+    }
+
+    const owners = getOwners(file);
+
+    res.json(owners)
+}

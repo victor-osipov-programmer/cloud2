@@ -12,5 +12,6 @@ router.patch('/files/:file_id', auth([]), controllers.editFile)
 router.delete('/files/:file_id', auth([]), controllers.deleteFile)
 router.get('/files/:file_id', auth([]), controllers.downloadFile)
 router.post('/files/:file_id/accesses', auth([]), controllers.addAccess)
+router.delete('/files/:file_id/accesses', auth([]), controllers.deleteAccess)
 
 export default router;
