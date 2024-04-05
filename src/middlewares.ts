@@ -2,11 +2,12 @@ import { GeneralError, ValidationError, LoginFailed } from './errors'
 import { AppDataSource } from './db/data-source'
 import { User } from './db/entities'
 import jwt from 'jsonwebtoken'
+import { FindOptionsRelationByString, FindOptionsRelations } from 'typeorm/browser'
 const secret_key = process.env.SECRET_KEY
 
 const userRepository = AppDataSource.getRepository(User)
 
-export function auth(roles) {
+export function auth(roles, relations: FindOptionsRelations<User> = {}) {
     return async (req, res, next) => {
         try {
             const token = req.get('Authorization')?.split(' ')[1]
@@ -21,7 +22,8 @@ export function auth(roles) {
                     token
                 },
                 relations: {
-                    role: true
+                    role: true,
+                    ...relations
                 }
             })
             if (!user || (!roles.includes(user.role.name) && roles.length !== 0)) {

@@ -8,7 +8,6 @@ import path from 'path'
 import { roles } from "./db/init";
 const secret_key = process.env.SECRET_KEY
 
-
 const userRepository = AppDataSource.getRepository(User)
 const fileRepository = AppDataSource.getRepository(DBFile)
 
@@ -30,21 +29,31 @@ async function fileAccess(file, user, access = 'all') {
     }
 }
 
-function getOwners(file: DBFile) {
-    const res = []
 
-    const getData = (user: User, type) => {
-        return {
-            fullname: user.first_name + ' ' + user.last_name,
-            email: user.email,
-            type
-        }
+function getDataOwner(owner: User, type) {
+    return {
+        fullname: owner.first_name + ' ' + owner.last_name,
+        email: owner.email,
+        type
     }
+}
 
-    res.push(getData(file.author, 'author'))
-    res.push(...file.users.map(user => getData(user, 'co-author')))
-    
-    return res;
+function getOwners(file: DBFile) {
+    return [
+        getDataOwner(file.author, 'author'),
+        ...file.users.map(user => getDataOwner(user, 'co-author'))
+    ]
+}
+
+function getDataFile(file, accesses = true) {
+    const data = {
+        file_id: file.id,
+        name: file.name,
+        url: file.url
+    }
+    if (accesses) data['accesses'] = getOwners(file);
+
+    return data;
 }
 
 export async function authorization(req, res, next) {
@@ -148,6 +157,7 @@ interface IFile {
     path: string, // 'uploads\\1 кролл.jpg'
     size: number // 1855491 byte
 }
+
 export async function files(req, res, next) {
     const user: User = req.user;
     let files: IFile[] = req.files
@@ -168,7 +178,7 @@ export async function files(req, res, next) {
 
         const new_file = new DBFile()
         const file_id = randomString(10)
-        const url = `${process.env.PROTOCOL}://${process.env.HOST}:${process.env.PORT}/${process.env.FILES}/${file_id}`
+        const url = `${process.env.PROTOCOL}://${process.env.HOST}:${process.env.PORT}/files/${file_id}`
 
         new_file.id = file_id;
         new_file.url = url;
@@ -251,14 +261,9 @@ export async function deleteFile(req, res, next) {
             users: true
         }
     })
-
-    try {
-        await fileAccess(file, user)
-    } catch (err) {
-        return next(err)
-    }
     
     try {
+        await fileAccess(file, user)
         await fs.rm(`${process.env.FILES}/${file.name}`)
         await fileRepository.remove(file)
     } catch (err) {
@@ -338,9 +343,7 @@ export async function addAccess(req, res, next) {
     }
 
     const owners = getOwners(file);
-
     res.json(owners)
-
 }
 
 export async function deleteAccess(req, res, next) {
@@ -368,7 +371,6 @@ export async function deleteAccess(req, res, next) {
         return next(err)
     }
     
-
     const coauthor = await userRepository.findOneBy({ email })
 
     if (!coauthor) {
@@ -381,7 +383,6 @@ export async function deleteAccess(req, res, next) {
         return next(new NotFound())
     }
     
-
     file.users = file.users.filter(owner => owner.id !== coauthor.id)
 
     try {
@@ -391,6 +392,15 @@ export async function deleteAccess(req, res, next) {
     }
 
     const owners = getOwners(file);
-
     res.json(owners)
+}
+
+export async function getFilesUser(req, res, next) {
+    const user: User = req.user;
+    res.json(user.files_author.map(file => getDataFile(file)))
+}
+
+export async function shared(req, res, next) {
+    const user: User = req.user;
+    res.json(user.files.map(file => getDataFile(file, false)))
 }
