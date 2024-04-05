@@ -27,9 +27,9 @@ export class User {
     @Column()
     password: string
 
-    @ManyToMany(() => DBFile, dbfile => dbfile.users)
+    @ManyToMany(() => DBFile, dbfile => dbfile.coauthors)
     @JoinTable({
-        name: 'user_id_file_id',
+        name: 'coauthors',
         joinColumn: {
             name: 'user_id'
         },
@@ -37,10 +37,10 @@ export class User {
             name: 'file_id'
         }
     })
-    files: Relation<DBFile[]>
+    shared_files: Relation<DBFile[]>
 
     @OneToMany(() => DBFile, dbfile => dbfile.author)
-    files_author: Relation<DBFile[]>
+    author_files: Relation<DBFile[]>
 }
 
 @Entity('roles')
@@ -69,10 +69,10 @@ export class DBFile {
     @Column()
     name: string
 
-    @ManyToMany(() => User, user => user.files)
-    users: Relation<User[]>
+    @ManyToMany(() => User, user => user.shared_files)
+    coauthors: Relation<User[]>
 
-    @ManyToOne(() => User, user => user.files_author)
+    @ManyToOne(() => User, user => user.author_files)
     @JoinColumn({ name: 'user_id_author' })
     author: Relation<User>
 }

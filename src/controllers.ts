@@ -11,9 +11,10 @@ const secret_key = process.env.SECRET_KEY
 const userRepository = AppDataSource.getRepository(User)
 const fileRepository = AppDataSource.getRepository(DBFile)
 
-async function fileAccess(file, user, access = 'all') {
+
+async function fileAccess(file: DBFile, user, access = 'all') {
     if (file?.author.id !== user.id) {
-        if (access == 'author' || !file?.users?.some(owner => owner.id === user.id)) {
+        if (access == 'author' || !file?.coauthors?.some(coauthor => coauthor.id === user.id)) {
             throw new ForbiddenForYou()
         }
     }
@@ -29,19 +30,18 @@ async function fileAccess(file, user, access = 'all') {
     }
 }
 
-
-function getDataOwner(owner: User, type) {
+function getDataUser(user: User, type) {
     return {
-        fullname: owner.first_name + ' ' + owner.last_name,
-        email: owner.email,
+        fullname: user.first_name + ' ' + user.last_name,
+        email: user.email,
         type
     }
 }
 
-function getOwners(file: DBFile) {
+function getDataUsers(file: DBFile) {
     return [
-        getDataOwner(file.author, 'author'),
-        ...file.users.map(user => getDataOwner(user, 'co-author'))
+        getDataUser(file.author, 'author'),
+        ...file.coauthors.map(user => getDataUser(user, 'co-author'))
     ]
 }
 
@@ -51,10 +51,11 @@ function getDataFile(file, accesses = true) {
         name: file.name,
         url: file.url
     }
-    if (accesses) data['accesses'] = getOwners(file);
+    if (accesses) data['accesses'] = getDataUsers(file);
 
     return data;
 }
+
 
 export async function authorization(req, res, next) {
     const body = req.body;
@@ -219,7 +220,7 @@ export async function editFile(req, res, next) {
         },
         relations: {
             author: true,
-            users: true
+            coauthors: true
         }
     })
 
@@ -258,7 +259,7 @@ export async function deleteFile(req, res, next) {
         },
         relations: {
             author: true,
-            users: true
+            coauthors: true
         }
     })
     
@@ -284,7 +285,7 @@ export async function downloadFile(req, res, next) {
         },
         relations: {
             author: true,
-            users: true
+            coauthors: true
         }
     })
 
@@ -312,7 +313,7 @@ export async function addAccess(req, res, next) {
         },
         relations: {
             author: true,
-            users: true
+            coauthors: true
         }
     })
 
@@ -330,11 +331,11 @@ export async function addAccess(req, res, next) {
     if (user.id == coauthor.id) {
         return next(new ForbiddenForYou())
     }
-    if (file.users.some(owner_user => owner_user.id === coauthor.id )) {
+    if (file.coauthors.some(user => user.id === coauthor.id )) {
         return next({ message: 'Уже был добавлен' })
     }
 
-    file.users.push(coauthor)
+    file.coauthors.push(coauthor)
 
     try {
         await fileRepository.save(file)
@@ -342,8 +343,8 @@ export async function addAccess(req, res, next) {
         return next(err)
     }
 
-    const owners = getOwners(file);
-    res.json(owners)
+    const users = getDataUsers(file);
+    res.json(users)
 }
 
 export async function deleteAccess(req, res, next) {
@@ -361,7 +362,7 @@ export async function deleteAccess(req, res, next) {
         },
         relations: {
             author: true,
-            users: true
+            coauthors: true
         }
     })
 
@@ -379,11 +380,11 @@ export async function deleteAccess(req, res, next) {
     if (user.id == coauthor.id) {
         return next(new ForbiddenForYou())
     }
-    if (!file.users?.some(owner => owner.id === coauthor.id)) {
+    if (!file.coauthors?.some(user => user.id === coauthor.id)) {
         return next(new NotFound())
     }
     
-    file.users = file.users.filter(owner => owner.id !== coauthor.id)
+    file.coauthors = file.coauthors.filter(user => user.id !== coauthor.id)
 
     try {
         await fileRepository.save(file)
@@ -391,16 +392,16 @@ export async function deleteAccess(req, res, next) {
         return next(err)
     }
 
-    const owners = getOwners(file);
-    res.json(owners)
+    const users = getDataUsers(file);
+    res.json(users)
 }
 
 export async function getFilesUser(req, res, next) {
     const user: User = req.user;
-    res.json(user.files_author.map(file => getDataFile(file)))
+    res.json(user.author_files.map(file => getDataFile(file)))
 }
 
 export async function shared(req, res, next) {
     const user: User = req.user;
-    res.json(user.files.map(file => getDataFile(file, false)))
+    res.json(user.shared_files.map(file => getDataFile(file, false)))
 }
