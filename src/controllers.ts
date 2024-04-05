@@ -12,7 +12,7 @@ const userRepository = AppDataSource.getRepository(User)
 const fileRepository = AppDataSource.getRepository(DBFile)
 
 
-async function fileAccess(file: DBFile, user, access = 'all') {
+async function fileAccess(file: DBFile, user, access = 'author') {
     if (file?.author.id !== user.id) {
         if (access == 'author' || !file?.coauthors?.some(coauthor => coauthor.id === user.id)) {
             throw new ForbiddenForYou()
@@ -24,7 +24,7 @@ async function fileAccess(file: DBFile, user, access = 'all') {
     }
 
     try {
-        await fs.access(`${process.env.FILES}/${file.name}`, fs.constants.F_OK)
+        await fs.access(path.join(process.env.FILES, String(file.author.id), file.name) , fs.constants.F_OK)
     } catch (err) {
         throw new NotFound()
     }
@@ -154,9 +154,9 @@ interface IFile {
     encoding: string,
     mimetype: string,
     destination: string,
-    filename: string, // '1 кролл.jpg' 
-    path: string, // 'uploads\\1 кролл.jpg'
-    size: number // 1855491 byte
+    filename: string,
+    path: string,
+    size: number
 }
 
 export async function files(req, res, next) {
@@ -231,12 +231,12 @@ export async function editFile(req, res, next) {
     }
 
     try {
-        await fs.access(`${process.env.FILES}/${name}`, fs.constants.F_OK)
+        await fs.access(path.join(process.env.FILES, String(file.author.id), name), fs.constants.F_OK)
         throw new FileNameIsOccupied()
     } catch (err) {
         if (err.errno == -4058) {
 
-            await fs.rename(`${process.env.FILES}/${file.name}`, `${process.env.FILES}/${name}`)
+            await fs.rename(path.join(process.env.FILES, String(file.author.id), file.name), path.join(process.env.FILES, String(file.author.id), name))
             file.name = name
             await fileRepository.save(file)
 
@@ -265,7 +265,12 @@ export async function deleteFile(req, res, next) {
     
     try {
         await fileAccess(file, user)
-        await fs.rm(`${process.env.FILES}/${file.name}`)
+        await fs.rm(path.join(process.env.FILES, String(file.author.id), file.name))
+        try {
+            await fs.rmdir(path.join(process.env.FILES, String(file.author.id)))
+        } catch (err) {
+            console.log(err)
+        }
         await fileRepository.remove(file)
     } catch (err) {
         return next(err)
@@ -290,12 +295,12 @@ export async function downloadFile(req, res, next) {
     })
 
     try {
-        await fileAccess(file, user)
+        await fileAccess(file, user, 'all')
     } catch (err) {
         return next(err)
     }
 
-    res.sendFile(path.resolve(process.env.FILES, file.name))
+    res.sendFile(path.resolve(process.env.FILES, String(file.author.id), file.name))
 }
 
 export async function addAccess(req, res, next) {
@@ -318,7 +323,7 @@ export async function addAccess(req, res, next) {
     })
 
     try {
-        await fileAccess(file, user, 'author')
+        await fileAccess(file, user)
     } catch (err) {
         return next(err)
     }
@@ -367,7 +372,7 @@ export async function deleteAccess(req, res, next) {
     })
 
     try {
-        await fileAccess(file, user, 'author')
+        await fileAccess(file, user)
     } catch (err) {
         return next(err)
     }
