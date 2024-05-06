@@ -17,6 +17,8 @@ const storage = multer.diskStorage({
         cb(null, path.join(path_to_files, String(user.id)))
     },
     filename: async function (req, file, cb) {
+        file.originalname = Buffer.from(file.originalname, 'latin1').toString();
+        
         const user: User = req.user;
         let number = 1;
         let file_name = file.originalname;

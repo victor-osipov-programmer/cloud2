@@ -165,7 +165,8 @@ export async function files(req, res, next) {
     
     const promises = files.map(async (file) => new Promise(async (resolve) => {
         const mb = file.size / 1024 / 1024
-        const type = file.filename.slice(file.filename.lastIndexOf('.') + 1)
+        const file_name = file.filename;
+        const type = file_name.slice(file_name.lastIndexOf('.') + 1)
 
         if (mb > 2 || !['doc', 'pdf', 'docx', 'zip', 'jpeg', 'jpg', 'png'].includes(type)) {
             await fs.rm(file.path)
@@ -173,7 +174,7 @@ export async function files(req, res, next) {
             return resolve({
                 success: false,
                 message: 'File not loaded',
-                name: file.filename
+                name: file_name
             })
         }
 
@@ -183,7 +184,7 @@ export async function files(req, res, next) {
 
         new_file.id = file_id;
         new_file.url = url;
-        new_file.name = file.filename;
+        new_file.name = file_name;
         new_file.author = user;
 
         try {
@@ -195,7 +196,7 @@ export async function files(req, res, next) {
         resolve({
             success: true,
             message: 'Success',
-            name: file.filename,
+            name: file_name,
             url: url,
             file_id: file_id
         })
